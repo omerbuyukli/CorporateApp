@@ -55,6 +55,10 @@ namespace CorporateApp.API.Controllers
         [HttpGet("test-connection")]
         public IActionResult TestConnection()
         {
+
+
+
+
             var stats = JobStorage.Current.GetMonitoringApi();
             var servers = stats.Servers();
 

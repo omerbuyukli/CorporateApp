@@ -13,6 +13,8 @@ using CorporateApp.Infrastructure.Filters;    // ← EKLE
 using CorporateApp.Application.Interfaces;    // ← EKLE
 using CorporateApp.Infrastructure.Services.DiaServices;  // ← Bu satırı ekleyin
 using CorporateApp.Application.Services;
+using CorporateApp.Infrastructure.Configuration;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -68,24 +70,18 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
     options.AddPolicy("UserOnly", policy => policy.RequireRole("User"));
 });
-
-// Swagger with JWT support
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "CorporateApp API",
-        Version = "v1",
-        Description = "Corporate Application API with JWT Authentication"
-    });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
 
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
         Name = "Authorization",
         In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT"
     });
 
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -99,19 +95,50 @@ builder.Services.AddSwaggerGen(c =>
                     Id = "Bearer"
                 }
             },
-            Array.Empty<string>()
+            new string[] {}
         }
     });
 });
 
+
+
 builder.Services.AddHttpClient("DiaApi", client =>
 {
-    client.BaseAddress = new Uri(builder.Configuration["DiaApi:BaseUrl"]);
+    var baseUrl = builder.Configuration["DiaApi:BaseUrl"] ?? "https://fayev.ws.dia.com.tr/";
+
+    // Sonunda / olduğundan emin ol
+    if (!baseUrl.EndsWith("/"))
+        baseUrl += "/";
+
+    client.BaseAddress = new Uri(baseUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    // Content-Type header'ını BURAYA EKLEMEYİN!
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 
-// Register DIA services
+
+builder.Services.Configure<DiaApiConfiguration>(
+    builder.Configuration.GetSection("DiaApi")
+);
+// HttpClient configuration
+builder.Services.AddHttpClient("DiaApi", (serviceProvider, client) =>
+{
+    var configuration = serviceProvider.GetRequiredService<IOptions<DiaApiConfiguration>>();
+    var baseUrl = configuration.Value.BaseUrl;
+
+    if (!baseUrl.EndsWith("/"))
+        baseUrl += "/";
+
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout = TimeSpan.FromSeconds(configuration.Value.Timeout);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+});
+
+// Service registration - MEVCUT KODU DEĞİŞTİRİN
 builder.Services.AddScoped<IDiaLoginService, DiaLoginService>();
+builder.Services.AddScoped<IPersonelSyncService, PersonelSyncService>();
+
+// Register DIA services 
 builder.Services.AddScoped<IPersonelSyncService, PersonelSyncService>();
 builder.Services.AddScoped<IPersonelSyncJobService, PersonelSyncJobService>();
 
@@ -168,7 +195,7 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 // Middleware order is important!
 app.UseHttpsRedirection();
 app.UseSerilogRequestLogging();
-app.UseAuthentication(); // Must be before UseAuthorization
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
@@ -234,34 +261,55 @@ Log.Information($"Environment: {app.Environment.EnvironmentName}");
 Log.Information($"URLs: {string.Join(", ", builder.WebHost.GetSetting(WebHostDefaults.ServerUrlsKey)?.Split(';') ?? new[] { "http://localhost:5000" })}");
 
 
-// using (var scope = app.Services.CreateScope())
+using (var scope = app.Services.CreateScope())
+{
+    var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+
+    // Her gün saat 02:00'de çalışacak
+    recurringJobManager.AddOrUpdate<IErpSyncJobService>(
+        "erp-daily-sync",
+        service => service.SyncUsersFromErpAsync(),
+        "0 2 * * *", // CRON expression
+        new RecurringJobOptions
+        {
+            TimeZone = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time")
+            // Queue özelliği kaldırıldı
+        });
+
+    // Her 30 dakikada bir çalışacak
+    recurringJobManager.AddOrUpdate<IErpSyncJobService>(
+        "erp-incremental-sync",
+        service => service.IncrementalSyncAsync(),
+        "*/30 * * * *",
+        new RecurringJobOptions
+        {
+            TimeZone = TimeZoneInfo.Local  // veya TimeZoneInfo.Utc
+            // Queue özelliği kaldırıldı
+        });
+}
+
+
+// app.MapGet("/test-login", async (IDiaLoginService diaLoginService, ILogger<Program> logger) =>
 // {
-//     var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+//     try
+//     {
+//         var result = await diaLoginService.LoginAsync();
 
-//     // Her gün saat 02:00'de çalışacak
-//     recurringJobManager.AddOrUpdate<IErpSyncJobService>(
-//         "erp-daily-sync",
-//         service => service.SyncUsersFromErpAsync(),
-//         "0 2 * * *", // CRON expression
-//         new RecurringJobOptions
+//         logger.LogInformation($"Login test - Success: {result.Success}, SessionId: {result.SessionId}");
+
+//         return Results.Ok(new
 //         {
-//             TimeZone = TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time")
-//             // Queue özelliği kaldırıldı
+//             success = result.Success,
+//             sessionId = result.SessionId,
+//             message = result.Message
 //         });
-
-//     // Her 30 dakikada bir çalışacak
-//     recurringJobManager.AddOrUpdate<IErpSyncJobService>(
-//         "erp-incremental-sync",
-//         service => service.IncrementalSyncAsync(),
-//         "*/30 * * * *",
-//         new RecurringJobOptions
-//         {
-//             TimeZone = TimeZoneInfo.Local  // veya TimeZoneInfo.Utc
-//             // Queue özelliği kaldırıldı
-//         });
-// }
-
-
+//     }
+//     catch (Exception ex)
+//     {
+//         logger.LogError(ex, "Login test failed");
+//         return Results.Problem(ex.Message);
+//     }
+// });
 
 
 app.Run();

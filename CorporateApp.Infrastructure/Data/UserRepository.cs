@@ -26,10 +26,23 @@ namespace CorporateApp.Infrastructure.Data
 
         public async Task<User> GetByTcnoAsync(string tcno)
         {
-            return await _context.Users
-                .FirstOrDefaultAsync(u => u.Tcno == tcno);
-        }
+            if (string.IsNullOrWhiteSpace(tcno))
+                throw new ArgumentException("Tcno boş olamaz.", nameof(tcno));
 
+            if (!tcno.All(char.IsDigit))
+                throw new ArgumentException("Tcno sadece rakamlardan oluşmalıdır.", nameof(tcno));
+
+            try
+            {
+                var ret = await _context.Users.FirstOrDefaultAsync(u => u.Tcno == tcno);
+
+                return ret;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Veritabanı sorgusu sırasında hata oluştu.", ex);
+            }
+        }
         public async Task<IEnumerable<User>> GetActiveUsersAsync()
         {
             return await _context.Users
@@ -72,8 +85,8 @@ namespace CorporateApp.Infrastructure.Data
         }
 
         public async Task<(IEnumerable<User> Users, int TotalCount)> GetPagedUsersAsync(
-            int pageNumber, 
-            int pageSize, 
+            int pageNumber,
+            int pageSize,
             string searchTerm = null,
             int? roleId = null,
             bool? isActive = null)

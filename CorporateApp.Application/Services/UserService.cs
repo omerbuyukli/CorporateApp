@@ -59,7 +59,7 @@ namespace CorporateApp.Application.Services
                 };
 
                 await _userRepository.AddAsync(user);
-                
+
                 _logger.LogInformation("User created successfully: {Email}", user.Email);
                 return _mapper.Map<UserDto>(user);
             }
@@ -118,7 +118,7 @@ namespace CorporateApp.Application.Services
             user.UpdatedDate = DateTime.UtcNow;
 
             await _userRepository.UpdateAsync(user);
-            
+
             _logger.LogInformation("User updated successfully: {Id}", id);
             return _mapper.Map<UserDto>(user);
         }
@@ -147,7 +147,7 @@ namespace CorporateApp.Application.Services
             );
 
             var userListDtos = _mapper.Map<IEnumerable<UserListDto>>(result.Users);
-            
+
             return new UserListResponse
             {
                 Users = userListDtos,

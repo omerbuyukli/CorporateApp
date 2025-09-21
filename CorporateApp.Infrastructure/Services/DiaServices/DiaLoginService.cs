@@ -1,65 +1,68 @@
-using CorporateApp.Application.Interfaces;
-using CorporateApp.Core.Entities.DiaEntities;
-using System.Text.Json;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
+using CorporateApp.Infrastructure.Configuration;
+using CorporateApp.Infrastructure.Constants;
 using Microsoft.Extensions.Logging;
+using CorporateApp.Application.Interfaces;
 
 namespace CorporateApp.Infrastructure.Services.DiaServices
 {
-    public class DiaLoginService : IDiaLoginService
+    public class DiaLoginService : DiaApiServiceBase, IDiaLoginService
     {
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IConfiguration _configuration;
-        private readonly ILogger<DiaLoginService> _logger;
-
         public DiaLoginService(
             IHttpClientFactory httpClientFactory,
-            IConfiguration configuration,
+            IOptions<DiaApiConfiguration> configuration,
             ILogger<DiaLoginService> logger)
+            : base(httpClientFactory, configuration, logger)
         {
-            _httpClientFactory = httpClientFactory;
-            _configuration = configuration;
-            _logger = logger;
         }
 
         public async Task<(bool Success, string SessionId, string Message)> LoginAsync()
         {
             try
             {
-                var account = new Account
+                var loginRequest = new
                 {
-                    Login = new Login
+                    login = new
                     {
-                        Username = _configuration["DiaApi:Username"],
-                        Password = _configuration["DiaApi:Password"],
-                        Params = new Params
+                        username = _configuration.Username,
+                        password = _configuration.Password,
+                        @params = new
                         {
-                            ApiKey = _configuration["DiaApi:ApiKey"]
+                            apikey = _configuration.ApiKey
                         },
-                        Lang = "tr",
-                        DisconnectSameUser = "True"
+                        disconnect_same_user = "True"
                     }
                 };
 
-                var client = _httpClientFactory.CreateClient("DiaApi");
-                var json = JsonSerializer.Serialize(account);
-                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                // Constants'tan module adını al, Configuration'dan endpoint'i al
+                var response = await SendRequestAsync<dynamic>(
+                    DiaApiConstants.Modules.SIS,
+                    loginRequest
+                );
 
-                var response = await client.PostAsync("login", content);
-
-                if (response.IsSuccessStatusCode)
+                if (response != null)
                 {
-                    var responseContent = await response.Content.ReadAsStringAsync();
-                    var result = JsonSerializer.Deserialize<DynamicResponse>(responseContent);
+                    string code = response.code?.ToString();
+                    string msg = response.msg?.ToString();
 
-                    return (true, result.SessionId, result.Message);
+                    if (code == DiaApiConstants.ResponseCodes.Success)
+                    {
+                        SetSessionId(msg);
+                        return (true, msg, "Login successful");
+                    }
+                    else if (code == DiaApiConstants.ResponseCodes.Unauthorized)
+                    {
+                        return (false, null, $"Login failed: {msg}");
+                    }
+
+                    return (false, null, $"Unexpected response: {msg}");
                 }
 
-                return (false, null, "Login failed");
+                return (false, null, "No response from server");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Dia login error");
+                _logger.LogError(ex, "Login failed");
                 return (false, null, ex.Message);
             }
         }

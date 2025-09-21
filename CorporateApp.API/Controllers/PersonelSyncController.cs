@@ -6,7 +6,7 @@ namespace CorporateApp.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+
     public class PersonelSyncController : ControllerBase
     {
         private readonly IPersonelSyncJobService _jobService;
@@ -17,8 +17,12 @@ namespace CorporateApp.API.Controllers
         }
 
         [HttpPost("trigger")]
+        [Authorize]
         public IActionResult TriggerSync()
         {
+
+
+
             _jobService.TriggerImmediateSync();
             return Ok(new { message = "Sync job triggered successfully" });
         }

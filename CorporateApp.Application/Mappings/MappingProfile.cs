@@ -1,7 +1,7 @@
 using AutoMapper;
 using CorporateApp.Application.DTOs;
 using CorporateApp.Core.Entities;
-using CorporateApp.Application.DTOs.User;  // Bu satırı ekleyin!
+using CorporateApp.Application.DTOs.User;
 
 namespace CorporateApp.Application.Mappings
 {

@@ -16,36 +16,24 @@ namespace CorporateApp.Infrastructure.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // User entity configuration
             modelBuilder.Entity<User>(entity =>
             {
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
-                entity.Property(e => e.LastName).IsRequired().HasMaxLength(100);
-                entity.Property(e => e.Email).IsRequired().HasMaxLength(200);
-                entity.Property(e => e.Password).IsRequired();
-                entity.Property(e => e.Tcno).HasMaxLength(11);
-                entity.Property(e => e.Location).HasMaxLength(200);
+                entity.ToTable("Users");
+
+                entity.Property(e => e.Tcno)
+                      .HasMaxLength(11)
+                      .IsRequired();
+                // Sadece default değerler ve index'ler
+                entity.Property(e => e.RoleId).HasDefaultValue(2);
+                entity.Property(e => e.CreatedDate).HasDefaultValueSql("GETUTCDATE()");
+                entity.Property(e => e.IsActive).HasDefaultValue(true);
+
+                // Index'ler
                 entity.HasIndex(e => e.Email).IsUnique();
                 entity.HasIndex(e => e.Tcno).IsUnique();
             });
 
-            // Seed data (optional)
-            modelBuilder.Entity<User>().HasData(
-                new User 
-                { 
-                    Id = 1, 
-                    Name = "Admin",
-                    LastName = "User",
-                    Email = "admin@example.com",
-                    Password = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
-                    Tcno = "12345678901",
-                    Location = "Merkez",
-                    RoleId = 1,
-                    IsActive = true,
-                    CreatedDate = DateTime.UtcNow
-                }
-            );
+
         }
     }
 }

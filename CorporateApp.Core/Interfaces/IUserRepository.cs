@@ -14,8 +14,8 @@ namespace CorporateApp.Core.Interfaces
         Task<bool> TcnoExistsAsync(string tcno);
         Task<IEnumerable<User>> SearchUsersAsync(string searchTerm);
         Task<(IEnumerable<User> Users, int TotalCount)> GetPagedUsersAsync(
-            int pageNumber, 
-            int pageSize, 
+            int pageNumber,
+            int pageSize,
             string searchTerm = null,
             int? roleId = null,
             bool? isActive = null);

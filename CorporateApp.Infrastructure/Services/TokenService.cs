@@ -16,7 +16,7 @@ namespace CorporateApp.Infrastructure.Services
             _configuration = configuration;
         }
 
-        public string GenerateToken(string userId, string email, List<string> roles)
+        public string GenerateToken(string userId, string tcno, List<string> roles)
         {
             var jwtSettings = _configuration.GetSection("Jwt");
             var key = Encoding.ASCII.GetBytes(jwtSettings["Key"]);
@@ -24,7 +24,7 @@ namespace CorporateApp.Infrastructure.Services
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, userId),
-                new Claim(ClaimTypes.Email, email),
+                new Claim("Tcno", tcno),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
             };
