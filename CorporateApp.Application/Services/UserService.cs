@@ -156,5 +156,105 @@ namespace CorporateApp.Application.Services
                 PageSize = request.PageSize
             };
         }
+
+
+        public async Task<ChangePasswordResponseDto> ChangePasswordAsync(int userId, ChangePasswordDto changePasswordDto)
+        {
+            try
+            {
+                // Kullanıcıyı bul
+                var user = await _userRepository.GetByIdAsync(userId);
+                if (user == null)
+                {
+                    return new ChangePasswordResponseDto
+                    {
+                        Success = false,
+                        Message = "Kullanıcı bulunamadı"
+                    };
+                }
+
+                // Mevcut şifreyi kontrol et
+                if (!BCrypt.Net.BCrypt.Verify(changePasswordDto.CurrentPassword, user.Password))
+                {
+                    return new ChangePasswordResponseDto
+                    {
+                        Success = false,
+                        Message = "Mevcut şifre yanlış"
+                    };
+                }
+
+                // Yeni şifreyi hash'le
+                var hashedNewPassword = BCrypt.Net.BCrypt.HashPassword(changePasswordDto.NewPassword);
+
+                // Kullanıcının şifresini güncelle
+                user.Password = hashedNewPassword;
+                user.UpdatedDate = DateTime.UtcNow;
+
+                await _userRepository.UpdateAsync(user);
+
+                _logger.LogInformation($"Password changed successfully for user: {userId}");
+
+                return new ChangePasswordResponseDto
+                {
+                    Success = true,
+                    Message = "Şifre başarıyla değiştirildi"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error changing password for user: {userId}");
+                return new ChangePasswordResponseDto
+                {
+                    Success = false,
+                    Message = "Şifre değiştirme sırasında bir hata oluştu"
+                };
+            }
+        }
+
+
+        public async Task<ChangePasswordResponseDto> AdminChangePasswordAsync(int userId, AdminChangePasswordDto adminChangePasswordDto)
+        {
+            try
+            {
+                var user = await _userRepository.GetByIdAsync(userId);
+                if (user == null)
+                {
+                    return new ChangePasswordResponseDto
+                    {
+                        Success = false,
+                        Message = "Kullanıcı bulunamadı"
+                    };
+                }
+
+                // Admin için mevcut şifre kontrolü YOK
+                var hashedNewPassword = BCrypt.Net.BCrypt.HashPassword(adminChangePasswordDto.NewPassword);
+                user.Password = hashedNewPassword;
+                user.UpdatedDate = DateTime.UtcNow;
+
+                await _userRepository.UpdateAsync(user);
+
+                _logger.LogInformation($"Password changed by admin for user: {userId}");
+
+                return new ChangePasswordResponseDto
+                {
+                    Success = true,
+                    Message = "Kullanıcı şifresi başarıyla değiştirildi"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error changing password by admin for user: {userId}");
+                return new ChangePasswordResponseDto
+                {
+                    Success = false,
+                    Message = "Şifre değiştirme sırasında bir hata oluştu"
+                };
+            }
+        }
+
+
+
+
+
     }
 }

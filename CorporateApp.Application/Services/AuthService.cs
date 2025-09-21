@@ -23,14 +23,14 @@ namespace CorporateApp.Application.Services
 
             var user = await _userRepository.GetByTcnoAsync(loginDto.Tcno.Trim());
 
-            if (user.Name.ToLower() == "admin")
-            {
-                user.Password = BCrypt.Net.BCrypt.HashPassword("Admin123.");
+            // if (user.Name.ToLower() == "admin")
+            // {
+            //     user.Password = BCrypt.Net.BCrypt.HashPassword("Admin123.");
 
-                var retVal = _userRepository.UpdateAsync(user);
+            //     var retVal = _userRepository.UpdateAsync(user);
 
 
-            }
+            // }
 
 
             if (user == null)
@@ -41,11 +41,15 @@ namespace CorporateApp.Application.Services
             if (!isPasswordValid)
                 throw new UnauthorizedAccessException("Geçersiz şifre.");
 
+
+            var roles = await GetUserRolesAsync(user);
+
+
             // JWT token oluştur
             var token = _tokenService.GenerateToken(
                 userId: user.Id.ToString(),
                 tcno: user.Tcno.ToString(), // burada parametre adı GenerateToken(string userId, string tcno, List<string> roles)
-                roles: new List<string> { "Admin", "User" }
+                roles: roles
             );
 
             return new TokenResponseDto
@@ -56,6 +60,33 @@ namespace CorporateApp.Application.Services
         }
 
 
+        private async Task<List<string>> GetUserRolesAsync(User user)
+        {
+            var roles = new List<string>();
+
+            // RoleId'ye göre rol belirleme
+            switch (user.RoleId)
+            {
+                case 1:
+                    roles.Add("Admin");
+                    break;
+                case 2:
+                    roles.Add("User");
+                    break;
+                default:
+                    roles.Add("User"); // Default role
+                    break;
+            }
+
+            // Admin kullanıcısı için ek kontrol
+            if (user.Name?.ToLower() == "admin" || user.Email?.Contains("admin") == true)
+            {
+                if (!roles.Contains("Admin"))
+                    roles.Add("Admin");
+            }
+
+            return roles;
+        }
         public async Task<TokenResponseDto> RegisterAsync(RegisterDto registerDto)
         {
             // TODO: User registration logic

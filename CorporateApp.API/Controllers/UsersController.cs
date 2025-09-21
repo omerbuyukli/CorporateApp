@@ -4,12 +4,13 @@ using CorporateApp.Application.DTOs;
 using CorporateApp.Application.DTOs.User;
 using CorporateApp.Application.Interfaces;
 using System.Threading.Tasks;
+using System.Security.Claims;
 
 namespace CorporateApp.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
@@ -63,6 +64,57 @@ namespace CorporateApp.API.Controllers
             if (!result)
                 return NotFound();
             return NoContent();
+        }
+
+        // ÖNEMLİ: Route farklı olmalı - "change-password" eklendi
+        [HttpPost("change-password")]
+        [AllowAnonymous] // veya sadece [Authorize] - kendi şifresini değiştirebilir
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto changePasswordDto)
+        {
+            try
+            {
+                // Token'dan user ID'yi al
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+                {
+                    return Unauthorized(new { message = "Geçersiz kullanıcı token'ı" });
+                }
+
+                var result = await _userService.ChangePasswordAsync(userId, changePasswordDto);
+
+                if (result.Success)
+                {
+                    return Ok(result);
+                }
+
+                return BadRequest(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Sunucu hatası", error = ex.Message });
+            }
+        }
+
+        // Admin için başka kullanıcının şifresini değiştirme - farklı route
+        [HttpPost("{id}/change-password")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> AdminChangePassword(int id, [FromBody] AdminChangePasswordDto adminChangePasswordDto)
+        {
+            try
+            {
+                var result = await _userService.AdminChangePasswordAsync(id, adminChangePasswordDto);
+
+                if (result.Success)
+                {
+                    return Ok(result);
+                }
+
+                return BadRequest(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Sunucu hatası", error = ex.Message });
+            }
         }
     }
 }

@@ -13,5 +13,8 @@ namespace CorporateApp.Application.Interfaces
         Task<UserDto> UpdateUserAsync(int id, UserDto userDto);
         Task<bool> DeleteUserAsync(int id);
         Task<UserListResponse> GetUsersListAsync(GetUsersListRequest request);
+        Task<ChangePasswordResponseDto> ChangePasswordAsync(int userId, ChangePasswordDto changePasswordDto);
+        Task<ChangePasswordResponseDto> AdminChangePasswordAsync(int userId, AdminChangePasswordDto adminChangePasswordDto);
+
     }
 }
